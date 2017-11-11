@@ -42,726 +42,750 @@ $Password_Protected = new Password_Protected();
 
 class Password_Protected {
 
-	var $version = '2.1';
-	var $admin   = null;
-	var $errors  = null;
+    var $version = '2.1';
+    var $admin   = null;
+    var $errors  = null;
 
-	/**
-	 * Constructor
-	 */
-	public function __construct() {
+    /**
+     * Constructor
+     */
+    public function __construct() {
 
-		$this->errors = new WP_Error();
+        $this->errors = new WP_Error();
 
-		register_activation_hook( __FILE__, array( &$this, 'install' ) );
+        register_activation_hook( __FILE__, array( &$this, 'install' ) );
 
-		add_action( 'plugins_loaded', array( $this, 'load_plugin_textdomain' ) );
+        add_action( 'plugins_loaded', array( $this, 'load_plugin_textdomain' ) );
 
-		add_filter( 'password_protected_is_active', array( $this, 'allow_ip_addresses' ) );
+        add_filter( 'password_protected_is_active', array( $this, 'allow_ip_addresses' ) );
 
-		add_action( 'init', array( $this, 'disable_caching' ), 1 );
-		add_action( 'init', array( $this, 'maybe_process_logout' ), 1 );
-		add_action( 'init', array( $this, 'maybe_process_login' ), 1 );
-		add_action( 'wp', array( $this, 'disable_feeds' ) );
-		add_action( 'template_redirect', array( $this, 'maybe_show_login' ), -1 );
-		add_filter( 'pre_option_password_protected_status', array( $this, 'allow_feeds' ) );
-		add_filter( 'pre_option_password_protected_status', array( $this, 'allow_administrators' ) );
-		add_filter( 'pre_option_password_protected_status', array( $this, 'allow_users' ) );
-		add_action( 'init', array( $this, 'compat' ) );
-		add_action( 'password_protected_login_messages', array( $this, 'login_messages' ) );
-		add_action( 'login_enqueue_scripts', array( $this, 'load_theme_stylesheet' ), 5 );
+        add_action( 'init', array( $this, 'disable_caching' ), 1 );
+        add_action( 'init', array( $this, 'maybe_process_logout' ), 1 );
+        add_action( 'init', array( $this, 'maybe_process_login' ), 1 );
+        add_action( 'wp', array( $this, 'disable_feeds' ) );
+        add_action( 'template_redirect', array( $this, 'maybe_show_login' ), -1 );
+        add_filter( 'pre_option_password_protected_status', array( $this, 'allow_feeds' ) );
+        add_filter( 'pre_option_password_protected_status', array( $this, 'allow_administrators' ) );
+        add_filter( 'pre_option_password_protected_status', array( $this, 'allow_users' ) );
+        add_action( 'init', array( $this, 'compat' ) );
+        add_action( 'password_protected_login_messages', array( $this, 'login_messages' ) );
+        add_action( 'login_enqueue_scripts', array( $this, 'load_theme_stylesheet' ), 5 );
 
-		add_shortcode( 'password_protected_logout_link', array( $this, 'logout_link_shortcode' ) );
+        add_shortcode( 'password_protected_logout_link', array( $this, 'logout_link_shortcode' ) );
 
-		if ( is_admin() ) {
+        if ( is_admin() ) {
 
-			include_once( dirname( __FILE__ ) . '/admin/admin-caching.php' );
-			include_once( dirname( __FILE__ ) . '/admin/admin.php' );
+            include_once( dirname( __FILE__ ) . '/admin/admin-caching.php' );
+            include_once( dirname( __FILE__ ) . '/admin/admin.php' );
 
-			$this->admin_caching = new Password_Protected_Admin_Caching( $this );
-			$this->admin = new Password_Protected_Admin();
+            $this->admin_caching = new Password_Protected_Admin_Caching( $this );
+            $this->admin = new Password_Protected_Admin();
 
-		}
+        }
 
-	}
+    }
 
-	/**
-	 * I18n
-	 */
-	public function load_plugin_textdomain() {
+    /**
+     * I18n
+     */
+    public function load_plugin_textdomain() {
 
-		load_plugin_textdomain( 'password-protected', false, basename( dirname( __FILE__ ) ) . '/languages' );
+        load_plugin_textdomain( 'password-protected', false, basename( dirname( __FILE__ ) ) . '/languages' );
 
-	}
+    }
 
-	/**
-	 * Disable Page Caching
-	 */
-	public function disable_caching() {
+    /**
+     * Disable Page Caching
+     */
+    public function disable_caching() {
 
-		if ( $this->is_active() && ! defined( 'DONOTCACHEPAGE' ) ) {
-			define( 'DONOTCACHEPAGE', true );
-		}
+        if ( $this->is_active() && ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
 
-	}
+    }
 
-	/**
-	 * Is Active?
-	 *
-	 * @return  boolean  Is password protection active?
-	 */
-	public function is_active() {
+    /**
+     * Is Active?
+     *
+     * @return  boolean  Is password protection active?
+     */
+    public function is_active() {
 
-		global $wp_query;
+        global $wp_query;
 
-		// Always allow access to robots.txt
-		if ( isset( $wp_query ) && is_robots() ) {
-			return false;
-		}
+        // Always allow access to robots.txt
+        if ( isset( $wp_query ) && is_robots() ) {
+            return false;
+        }
 
-		if ( (bool) get_option( 'password_protected_status' ) ) {
-			$is_active = true;
-		} else {
-			$is_active = false;
-		}
+        if ( (bool) get_option( 'password_protected_status' ) ) {
+            $is_active = true;
+        } else {
+            $is_active = false;
+        }
 
-		$is_active = apply_filters( 'password_protected_is_active', $is_active );
+        $is_active = apply_filters( 'password_protected_is_active', $is_active );
 
-		if ( isset( $_GET['password-protected'] ) ) {
-			$is_active = true;
-		}
+        if ( isset( $_GET['password-protected'] ) ) {
+            $is_active = true;
+        }
 
-		return $is_active;
+        return $is_active;
 
-	}
+    }
 
-	/**
-	 * Disable Feeds
-	 *
-	 * @todo  An option/filter to prevent disabling of feeds.
-	 */
-	public function disable_feeds() {
+    /**
+     * Disable Feeds
+     *
+     * @todo  An option/filter to prevent disabling of feeds.
+     */
+    public function disable_feeds() {
 
-		if ( $this->is_active() ) {
-			add_action( 'do_feed', array( $this, 'disable_feed' ), 1 );
-			add_action( 'do_feed_rdf', array( $this, 'disable_feed' ), 1 );
-			add_action( 'do_feed_rss', array( $this, 'disable_feed' ), 1 );
-			add_action( 'do_feed_rss2', array( $this, 'disable_feed' ), 1 );
-			add_action( 'do_feed_atom', array( $this, 'disable_feed' ), 1 );
-		}
-
-	}
-
-	/**
-	 * Disable Feed
-	 *
-	 * @todo  Make Translatable
-	 */
-	public function disable_feed() {
-
-		wp_die( sprintf( __( 'Feeds are not available for this site. Please visit the <a href="%s">website</a>.', 'password-protected' ), get_bloginfo( 'url' ) ) );
-
-	}
+        if ( $this->is_active() ) {
+            add_action( 'do_feed', array( $this, 'disable_feed' ), 1 );
+            add_action( 'do_feed_rdf', array( $this, 'disable_feed' ), 1 );
+            add_action( 'do_feed_rss', array( $this, 'disable_feed' ), 1 );
+            add_action( 'do_feed_rss2', array( $this, 'disable_feed' ), 1 );
+            add_action( 'do_feed_atom', array( $this, 'disable_feed' ), 1 );
+        }
 
-	/**
-	 * Allow Feeds
-	 *
-	 * @param   boolean  $bool  Allow feeds.
-	 * @return  boolean         True/false.
-	 */
-	public function allow_feeds( $bool ) {
+    }
 
-		if ( is_feed() && (bool) get_option( 'password_protected_feeds' ) ) {
-			return 0;
-		}
+    /**
+     * Disable Feed
+     *
+     * @todo  Make Translatable
+     */
+    public function disable_feed() {
 
-		return $bool;
+        wp_die( sprintf( __( 'Feeds are not available for this site. Please visit the <a href="%s">website</a>.', 'password-protected' ), get_bloginfo( 'url' ) ) );
 
-	}
+    }
 
-	/**
-	 * Allow Administrators
-	 *
-	 * @param   boolean  $bool  Allow administrators.
-	 * @return  boolean         True/false.
-	 */
-	public function allow_administrators( $bool ) {
+    /**
+     * Allow Feeds
+     *
+     * @param   boolean  $bool  Allow feeds.
+     * @return  boolean         True/false.
+     */
+    public function allow_feeds( $bool ) {
 
-		if ( ! is_admin() && current_user_can( 'manage_options' ) && (bool) get_option( 'password_protected_administrators' ) ) {
-			return 0;
-		}
+        if ( is_feed() && (bool) get_option( 'password_protected_feeds' ) ) {
+            return 0;
+        }
 
-		return $bool;
+        return $bool;
 
-	}
+    }
 
-	/**
-	 * Allow Users
-	 *
-	 * @param   boolean  $bool  Allow administrators.
-	 * @return  boolean         True/false.
-	 */
-	public function allow_users( $bool ) {
+    /**
+     * Allow Administrators
+     *
+     * @param   boolean  $bool  Allow administrators.
+     * @return  boolean         True/false.
+     */
+    public function allow_administrators( $bool ) {
 
-		if ( ! is_admin() && is_user_logged_in() && (bool) get_option( 'password_protected_users' ) ) {
-			return 0;
-		}
+        if ( ! is_admin() && current_user_can( 'manage_options' ) && (bool) get_option( 'password_protected_administrators' ) ) {
+            return 0;
+        }
 
-		return $bool;
+        return $bool;
 
-	}
+    }
 
-	/**
-	 * Allow IP Addresses
-	 *
-	 * If user has a valid email address, return false to disable password protection.
-	 *
-	 * @param   boolean  $bool  Allow IP addresses.
-	 * @return  boolean         True/false.
-	 */
-	public function allow_ip_addresses( $bool ) {
+    /**
+     * Allow Users
+     *
+     * @param   boolean  $bool  Allow administrators.
+     * @return  boolean         True/false.
+     */
+    public function allow_users( $bool ) {
 
-		$ip_addresses = $this->get_allowed_ip_addresses();
+        if ( ! is_admin() && is_user_logged_in() && (bool) get_option( 'password_protected_users' ) ) {
+            return 0;
+        }
 
-		if ( in_array( $_SERVER['REMOTE_ADDR'], $ip_addresses ) ) {
-			$bool = false;
-		}
+        return $bool;
 
-		return $bool;
+    }
 
-	}
+    /**
+     * Get user's IP address
+     * @return string
+     */
+    public function get_ip_address() {
 
-	/**
-	 * Get Allowed IP Addresses
-	 *
-	 * @return  array  IP addresses.
-	 */
-	public function get_allowed_ip_addresses() {
+        if ( ! empty($_SERVER['HTTP_CLIENT_IP']) ) {
 
-		return explode( "\n", get_option( 'password_protected_allowed_ip_addresses' ) );
+            return $_SERVER['HTTP_CLIENT_IP'];
 
-	}
+        } else if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
 
-	/**
-	 * Encrypt Password
-	 *
-	 * @param  string  $password  Password.
-	 * @return string             Encrypted password.
-	 */
-	public function encrypt_password( $password ) {
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
 
-		return md5( $password );
+            return trim($ips[count($ips) - 1]);
 
-	}
+        } else {
 
-	/**
-	 * Maybe Process Logout
-	 */
-	public function maybe_process_logout() {
+            return $_SERVER['REMOTE_ADDR'];
 
-		if ( isset( $_REQUEST['password-protected'] ) && $_REQUEST['password-protected'] == 'logout' ) {
+        }
 
-			$this->logout();
+    }
 
-			if ( isset( $_REQUEST['redirect_to'] ) ) {
-				$redirect_to = esc_url_raw( $_REQUEST['redirect_to'], array( 'http', 'https' ) );
-			} else {
-				$redirect_to = home_url( '/' );
-			}
+    /**
+     * Allow IP Addresses
+     *
+     * If user has a valid email address, return false to disable password protection.
+     *
+     * @param   boolean  $bool  Allow IP addresses.
+     * @return  boolean         True/false.
+     */
+    public function allow_ip_addresses( $bool ) {
 
-			$this->safe_redirect( $redirect_to );
-			exit();
+        $ip_addresses = $this->get_allowed_ip_addresses();
 
-		}
+        if ( in_array( $this->get_ip_address(), $ip_addresses ) ) {
+            $bool = false;
+        }
 
-	}
+        return $bool;
 
-	/**
-	 * Maybe Process Login
-	 */
-	public function maybe_process_login() {
+    }
 
-		if ( $this->is_active() && isset( $_REQUEST['password_protected_pwd'] ) ) {
-			$password_protected_pwd = $_REQUEST['password_protected_pwd'];
-			$pwd = get_option( 'password_protected_password' );
+    /**
+     * Get Allowed IP Addresses
+     *
+     * @return  array  IP addresses.
+     */
+    public function get_allowed_ip_addresses() {
 
-			// If correct password...
-			if ( ( $this->encrypt_password( $password_protected_pwd ) == $pwd && $pwd != '' ) || apply_filters( 'password_protected_process_login', false, $password_protected_pwd ) ) {
+        return explode( "\n", get_option( 'password_protected_allowed_ip_addresses' ) );
 
-				$this->set_auth_cookie();
-				$redirect_to = isset( $_REQUEST['redirect_to'] ) ? $_REQUEST['redirect_to'] : '';
-				$redirect_to = apply_filters( 'password_protected_login_redirect', $redirect_to );
+    }
 
-				if ( ! empty( $redirect_to ) ) {
-					$this->safe_redirect( $redirect_to );
-					exit;
-				}
+    /**
+     * Encrypt Password
+     *
+     * @param  string  $password  Password.
+     * @return string             Encrypted password.
+     */
+    public function encrypt_password( $password ) {
 
-			} else {
+        return md5( $password );
 
-				// ... otherwise incorrect password
-				$this->clear_auth_cookie();
-				$this->errors->add( 'incorrect_password', __( 'Incorrect Password', 'password-protected' ) );
+    }
 
-			}
+    /**
+     * Maybe Process Logout
+     */
+    public function maybe_process_logout() {
 
-		}
+        if ( isset( $_REQUEST['password-protected'] ) && $_REQUEST['password-protected'] == 'logout' ) {
 
-	}
+            $this->logout();
 
-	/**
-	 * Is User Logged In?
-	 *
-	 * @return  boolean
-	 */
-	public function is_user_logged_in() {
+            if ( isset( $_REQUEST['redirect_to'] ) ) {
+                $redirect_to = esc_url_raw( $_REQUEST['redirect_to'], array( 'http', 'https' ) );
+            } else {
+                $redirect_to = home_url( '/' );
+            }
 
-		return $this->is_active() && $this->validate_auth_cookie();
+            $this->safe_redirect( $redirect_to );
+            exit();
 
-	}
+        }
 
-	/**
-	 * Maybe Show Login
-	 */
-	public function maybe_show_login() {
+    }
 
-		// Don't show login if not enabled
-		if ( ! $this->is_active() ) {
-			return;
-		}
+    /**
+     * Maybe Process Login
+     */
+    public function maybe_process_login() {
 
-		// Logged in
-		if ( $this->is_user_logged_in() ) {
-			return;
-		}
+        if ( $this->is_active() && isset( $_REQUEST['password_protected_pwd'] ) ) {
+            $password_protected_pwd = $_REQUEST['password_protected_pwd'];
+            $pwd = get_option( 'password_protected_password' );
 
-		// Show login form
-		if ( isset( $_REQUEST['password-protected'] ) && 'login' == $_REQUEST['password-protected'] ) {
+            // If correct password...
+            if ( ( $this->encrypt_password( $password_protected_pwd ) == $pwd && $pwd != '' ) || apply_filters( 'password_protected_process_login', false, $password_protected_pwd ) ) {
 
-			$default_theme_file = locate_template( array( 'password-protected-login.php' ) );
+                $this->set_auth_cookie();
+                $redirect_to = isset( $_REQUEST['redirect_to'] ) ? $_REQUEST['redirect_to'] : '';
+                $redirect_to = apply_filters( 'password_protected_login_redirect', $redirect_to );
 
-			if ( empty( $default_theme_file ) ) {
-				$default_theme_file = dirname( __FILE__ ) . '/theme/password-protected-login.php';
-			}
+                if ( ! empty( $redirect_to ) ) {
+                    $this->safe_redirect( $redirect_to );
+                    exit;
+                }
 
-			$theme_file = apply_filters( 'password_protected_theme_file', $default_theme_file );
-			if ( ! file_exists( $theme_file ) ) {
-				$theme_file = $default_theme_file;
-			}
+            } else {
 
-			load_template( $theme_file );
-			exit();
+                // ... otherwise incorrect password
+                $this->clear_auth_cookie();
+                $this->errors->add( 'incorrect_password', __( 'Incorrect Password', 'password-protected' ) );
 
-		} else {
+            }
 
-			$redirect_to = add_query_arg( 'password-protected', 'login', home_url() );
+        }
 
-			// URL to redirect back to after login
-			$redirect_to_url = apply_filters( 'password_protected_login_redirect_url', ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] );
-			if ( ! empty( $redirect_to_url ) ) {
-				$redirect_to = add_query_arg( 'redirect_to', urlencode( $redirect_to_url ), $redirect_to );
-			}
+    }
 
-			wp_redirect( $redirect_to );
-			exit();
+    /**
+     * Is User Logged In?
+     *
+     * @return  boolean
+     */
+    public function is_user_logged_in() {
 
-		}
-	}
+        return $this->is_active() && $this->validate_auth_cookie();
 
-	/**
-	 * Get Site ID
-	 *
-	 * @return  string  Site ID.
-	 */
-	public function get_site_id() {
+    }
 
-		global $blog_id;
-		return 'bid_' . apply_filters( 'password_protected_blog_id', $blog_id );
+    /**
+     * Maybe Show Login
+     */
+    public function maybe_show_login() {
 
-	}
+        // Don't show login if not enabled
+        if ( ! $this->is_active() ) {
+            return;
+        }
 
-	/**
-	 * Login URL
-	 *
-	 * @return  string  Login URL.
-	 */
-	public function login_url() {
+        // Logged in
+        if ( $this->is_user_logged_in() ) {
+            return;
+        }
 
-		return add_query_arg( 'password-protected', 'login', home_url( '/' ) );
+        // Show login form
+        if ( isset( $_REQUEST['password-protected'] ) && 'login' == $_REQUEST['password-protected'] ) {
 
-	}
+            $default_theme_file = locate_template( array( 'password-protected-login.php' ) );
 
-	/**
-	 * Logout
-	 */
-	public function logout() {
+            if ( empty( $default_theme_file ) ) {
+                $default_theme_file = dirname( __FILE__ ) . '/theme/password-protected-login.php';
+            }
 
-		$this->clear_auth_cookie();
-		do_action( 'password_protected_logout' );
+            $theme_file = apply_filters( 'password_protected_theme_file', $default_theme_file );
+            if ( ! file_exists( $theme_file ) ) {
+                $theme_file = $default_theme_file;
+            }
 
-	}
+            load_template( $theme_file );
+            exit();
 
-	/**
-	 * Logout URL
-	 *
-	 * @param   string  $redirect_to  Optional. Redirect URL.
-	 * @return  string                Logout URL.
-	 */
-	public function logout_url( $redirect_to = '' ) {
+        } else {
 
-		$query = array(
-			'password-protected' => 'logout',
-			'redirect_to'        => esc_url_raw( $redirect_to )
-		);
+            $redirect_to = add_query_arg( 'password-protected', 'login', home_url() );
 
-		if ( empty( $query['redirect_to'] ) ) {
-			unset( $query['redirect_to'] );
-		}
+            // URL to redirect back to after login
+            $redirect_to_url = apply_filters( 'password_protected_login_redirect_url', ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] );
+            if ( ! empty( $redirect_to_url ) ) {
+                $redirect_to = add_query_arg( 'redirect_to', urlencode( $redirect_to_url ), $redirect_to );
+            }
 
-		return add_query_arg( $query, home_url() );
+            wp_redirect( $redirect_to );
+            exit();
 
-	}
+        }
+    }
 
-	/**
-	 * Logout Link
-	 *
-	 * @param   array   $args  Link args.
-	 * @return  string         HTML link tag.
-	 */
-	public function logout_link( $args = null ) {
+    /**
+     * Get Site ID
+     *
+     * @return  string  Site ID.
+     */
+    public function get_site_id() {
 
-		// Only show if user is logged in
-		if ( ! $this->is_user_logged_in() ) {
-			return '';
-		}
+        global $blog_id;
+        return 'bid_' . apply_filters( 'password_protected_blog_id', $blog_id );
 
-		$args = wp_parse_args( $args, array(
-			'redirect_to' => '',
-			'text'        => __( 'Logout', 'password-protected' )
-		) );
+    }
 
-		if ( empty( $args['text'] ) ) {
-			$args['text'] = __( 'Logout', 'password-protected' );
-		}
+    /**
+     * Login URL
+     *
+     * @return  string  Login URL.
+     */
+    public function login_url() {
 
-		return sprintf( '<a href="%s">%s</a>', esc_url( $this->logout_url( $args['redirect_to'] ) ), esc_html( $args['text'] ) );
+        return add_query_arg( 'password-protected', 'login', home_url( '/' ) );
 
-	}
+    }
 
-	/**
-	 * Logout Link Shortcode
-	 *
-	 * @param   array   $args  Link args.
-	 * @return  string         HTML link tag.
-	 */
-	public function logout_link_shortcode( $atts, $content = null ) {
+    /**
+     * Logout
+     */
+    public function logout() {
 
-		$atts = shortcode_atts( array(
-			'redirect_to' => '',
-			'text'        => $content
-		), $atts, 'logout_link_shortcode' );
+        $this->clear_auth_cookie();
+        do_action( 'password_protected_logout' );
 
-		return $this->logout_link( $atts );
+    }
 
-	}
+    /**
+     * Logout URL
+     *
+     * @param   string  $redirect_to  Optional. Redirect URL.
+     * @return  string                Logout URL.
+     */
+    public function logout_url( $redirect_to = '' ) {
 
-	/**
-	 * Get Hashed Password
-	 *
-	 * @return  string  Hashed password.
-	 */
-	public function get_hashed_password() {
+        $query = array(
+            'password-protected' => 'logout',
+            'redirect_to'        => esc_url_raw( $redirect_to )
+        );
 
-		return md5( get_option( 'password_protected_password' ) . wp_salt() );
+        if ( empty( $query['redirect_to'] ) ) {
+            unset( $query['redirect_to'] );
+        }
 
-	}
+        return add_query_arg( $query, home_url() );
 
-	/**
-	 * Validate Auth Cookie
-	 *
-	 * @param   string   $cookie  Cookie string.
-	 * @param   string   $scheme  Cookie scheme.
-	 * @return  boolean           Validation successful?
-	 */
-	public function validate_auth_cookie( $cookie = '', $scheme = '' ) {
+    }
 
-		if ( ! $cookie_elements = $this->parse_auth_cookie( $cookie, $scheme ) ) {
-			do_action( 'password_protected_auth_cookie_malformed', $cookie, $scheme );
-			return false;
-		}
+    /**
+     * Logout Link
+     *
+     * @param   array   $args  Link args.
+     * @return  string         HTML link tag.
+     */
+    public function logout_link( $args = null ) {
 
-		extract( $cookie_elements, EXTR_OVERWRITE );
+        // Only show if user is logged in
+        if ( ! $this->is_user_logged_in() ) {
+            return '';
+        }
 
-		$expired = $expiration;
+        $args = wp_parse_args( $args, array(
+            'redirect_to' => '',
+            'text'        => __( 'Logout', 'password-protected' )
+        ) );
 
-		// Allow a grace period for POST and AJAX requests
-		if ( defined( 'DOING_AJAX' ) || 'POST' == $_SERVER['REQUEST_METHOD'] ) {
-			$expired += 3600;
-		}
+        if ( empty( $args['text'] ) ) {
+            $args['text'] = __( 'Logout', 'password-protected' );
+        }
 
-		// Quick check to see if an honest cookie has expired
-		if ( $expired < current_time( 'timestamp' ) ) {
-			do_action('password_protected_auth_cookie_expired', $cookie_elements);
-			return false;
-		}
+        return sprintf( '<a href="%s">%s</a>', esc_url( $this->logout_url( $args['redirect_to'] ) ), esc_html( $args['text'] ) );
 
-		$key = md5( $this->get_site_id() . $this->get_hashed_password() . '|' . $expiration );
-		$hash = hash_hmac( 'md5', $this->get_site_id() . '|' . $expiration, $key);
+    }
 
-		if ( $hmac != $hash ) {
-			do_action( 'password_protected_auth_cookie_bad_hash', $cookie_elements );
-			return false;
-		}
+    /**
+     * Logout Link Shortcode
+     *
+     * @param   array   $args  Link args.
+     * @return  string         HTML link tag.
+     */
+    public function logout_link_shortcode( $atts, $content = null ) {
 
-		if ( $expiration < current_time( 'timestamp' ) ) { // AJAX/POST grace period set above
-			$GLOBALS['login_grace_period'] = 1;
-		}
+        $atts = shortcode_atts( array(
+            'redirect_to' => '',
+            'text'        => $content
+        ), $atts, 'logout_link_shortcode' );
 
-		return true;
+        return $this->logout_link( $atts );
 
-	}
+    }
 
-	/**
-	 * Generate Auth Cookie
-	 *
-	 * @param   int     $expiration  Expiration time in seconds.
-	 * @param   string  $scheme      Cookie scheme.
-	 * @return  string               Cookie.
-	 */
-	public function generate_auth_cookie( $expiration, $scheme = 'auth' ) {
+    /**
+     * Get Hashed Password
+     *
+     * @return  string  Hashed password.
+     */
+    public function get_hashed_password() {
 
-		$key = md5( $this->get_site_id() . $this->get_hashed_password() . '|' . $expiration );
-		$hash = hash_hmac( 'md5', $this->get_site_id() . '|' . $expiration, $key );
-		$cookie = $this->get_site_id() . '|' . $expiration . '|' . $hash;
+        return md5( get_option( 'password_protected_password' ) . wp_salt() );
 
-		return $cookie;
+    }
 
-	}
+    /**
+     * Validate Auth Cookie
+     *
+     * @param   string   $cookie  Cookie string.
+     * @param   string   $scheme  Cookie scheme.
+     * @return  boolean           Validation successful?
+     */
+    public function validate_auth_cookie( $cookie = '', $scheme = '' ) {
 
-	/**
-	 * Parse Auth Cookie
-	 *
-	 * @param   string  $cookie  Cookie string.
-	 * @param   string  $scheme  Cookie scheme.
-	 * @return  string           Cookie string.
-	 */
-	public function parse_auth_cookie( $cookie = '', $scheme = '' ) {
+        if ( ! $cookie_elements = $this->parse_auth_cookie( $cookie, $scheme ) ) {
+            do_action( 'password_protected_auth_cookie_malformed', $cookie, $scheme );
+            return false;
+        }
 
-		if ( empty( $cookie ) ) {
-			$cookie_name = $this->cookie_name();
+        extract( $cookie_elements, EXTR_OVERWRITE );
 
-			if ( empty( $_COOKIE[$cookie_name] ) ) {
-				return false;
-			}
-			$cookie = $_COOKIE[$cookie_name];
-		}
+        $expired = $expiration;
 
-		$cookie_elements = explode( '|', $cookie );
-		if ( count( $cookie_elements ) != 3 ) {
-			return false;
-		}
+        // Allow a grace period for POST and AJAX requests
+        if ( defined( 'DOING_AJAX' ) || 'POST' == $_SERVER['REQUEST_METHOD'] ) {
+            $expired += 3600;
+        }
 
-		list( $site_id, $expiration, $hmac ) = $cookie_elements;
+        // Quick check to see if an honest cookie has expired
+        if ( $expired < current_time( 'timestamp' ) ) {
+            do_action('password_protected_auth_cookie_expired', $cookie_elements);
+            return false;
+        }
 
-		return compact( 'site_id', 'expiration', 'hmac', 'scheme' );
+        $key = md5( $this->get_site_id() . $this->get_hashed_password() . '|' . $expiration );
+        $hash = hash_hmac( 'md5', $this->get_site_id() . '|' . $expiration, $key);
 
-	}
+        if ( $hmac != $hash ) {
+            do_action( 'password_protected_auth_cookie_bad_hash', $cookie_elements );
+            return false;
+        }
 
-	/**
-	 * Set Auth Cookie
-	 *
-	 * @todo
-	 *
-	 * @param  boolean  $remember  Remember logged in.
-	 * @param  string   $secure    Secure cookie.
-	 */
-	public function set_auth_cookie( $remember = false, $secure = '') {
+        if ( $expiration < current_time( 'timestamp' ) ) { // AJAX/POST grace period set above
+            $GLOBALS['login_grace_period'] = 1;
+        }
 
-		if ( $remember ) {
-			$expiration = $expire = current_time( 'timestamp' ) + apply_filters( 'password_protected_auth_cookie_expiration', 1209600, $remember );
-		} else {
-			$expiration = current_time( 'timestamp' ) + apply_filters( 'password_protected_auth_cookie_expiration', 172800, $remember );
-			$expire = 0;
-		}
+        return true;
 
-		if ( '' === $secure ) {
-			$secure = is_ssl();
-		}
+    }
 
-		$secure_password_protected_cookie = apply_filters( 'password_protected_secure_password_protected_cookie', false, $secure );
-		$password_protected_cookie = $this->generate_auth_cookie( $expiration, 'password_protected' );
+    /**
+     * Generate Auth Cookie
+     *
+     * @param   int     $expiration  Expiration time in seconds.
+     * @param   string  $scheme      Cookie scheme.
+     * @return  string               Cookie.
+     */
+    public function generate_auth_cookie( $expiration, $scheme = 'auth' ) {
 
-		setcookie( $this->cookie_name(), $password_protected_cookie, $expire, COOKIEPATH, COOKIE_DOMAIN, $secure_password_protected_cookie, true );
-		if ( COOKIEPATH != SITECOOKIEPATH ) {
-			setcookie( $this->cookie_name(), $password_protected_cookie, $expire, SITECOOKIEPATH, COOKIE_DOMAIN, $secure_password_protected_cookie, true );
-		}
+        $key = md5( $this->get_site_id() . $this->get_hashed_password() . '|' . $expiration );
+        $hash = hash_hmac( 'md5', $this->get_site_id() . '|' . $expiration, $key );
+        $cookie = $this->get_site_id() . '|' . $expiration . '|' . $hash;
 
-	}
+        return $cookie;
 
-	/**
-	 * Clear Auth Cookie
-	 */
-	public function clear_auth_cookie() {
+    }
 
-		setcookie( $this->cookie_name(), ' ', current_time( 'timestamp' ) - 31536000, COOKIEPATH, COOKIE_DOMAIN );
-		setcookie( $this->cookie_name(), ' ', current_time( 'timestamp' ) - 31536000, SITECOOKIEPATH, COOKIE_DOMAIN );
+    /**
+     * Parse Auth Cookie
+     *
+     * @param   string  $cookie  Cookie string.
+     * @param   string  $scheme  Cookie scheme.
+     * @return  string           Cookie string.
+     */
+    public function parse_auth_cookie( $cookie = '', $scheme = '' ) {
 
-	}
+        if ( empty( $cookie ) ) {
+            $cookie_name = $this->cookie_name();
 
-	/**
-	 * Cookie Name
-	 *
-	 * @return  string  Cookie name.
-	 */
-	public function cookie_name() {
-
-		return $this->get_site_id() . '_password_protected_auth';
-
-	}
+            if ( empty( $_COOKIE[$cookie_name] ) ) {
+                return false;
+            }
+            $cookie = $_COOKIE[$cookie_name];
+        }
 
-	/**
-	 * Install
-	 */
-	public function install() {
+        $cookie_elements = explode( '|', $cookie );
+        if ( count( $cookie_elements ) != 3 ) {
+            return false;
+        }
 
-		$old_version = get_option( 'password_protected_version' );
+        list( $site_id, $expiration, $hmac ) = $cookie_elements;
 
-		// 1.1 - Upgrade to MD5
-		if ( empty( $old_version ) || version_compare( '1.1', $old_version ) ) {
-			$pwd = get_option( 'password_protected_password' );
-			if ( ! empty( $pwd ) ) {
-				$new_pwd = $this->encrypt_password( $pwd );
-				update_option( 'password_protected_password', $new_pwd );
-			}
-		}
+        return compact( 'site_id', 'expiration', 'hmac', 'scheme' );
 
-		update_option( 'password_protected_version', $this->version );
+    }
 
-	}
+    /**
+     * Set Auth Cookie
+     *
+     * @todo
+     *
+     * @param  boolean  $remember  Remember logged in.
+     * @param  string   $secure    Secure cookie.
+     */
+    public function set_auth_cookie( $remember = false, $secure = '') {
 
-	/**
-	 * Compat
-	 *
-	 * Support for 3rd party plugins:
-	 *
-	 * - Login Logo       http://wordpress.org/extend/plugins/login-logo/
-	 * - Uber Login Logo  http://wordpress.org/plugins/uber-login-logo/
-	 */
-	public function compat() {
+        if ( $remember ) {
+            $expiration = $expire = current_time( 'timestamp' ) + apply_filters( 'password_protected_auth_cookie_expiration', 1209600, $remember );
+        } else {
+            $expiration = current_time( 'timestamp' ) + apply_filters( 'password_protected_auth_cookie_expiration', 172800, $remember );
+            $expire = 0;
+        }
 
-		if ( class_exists( 'CWS_Login_Logo_Plugin' ) ) {
+        if ( '' === $secure ) {
+            $secure = is_ssl();
+        }
 
-			// Add support for Mark Jaquith's Login Logo plugin
-			add_action( 'password_protected_login_head', array( new CWS_Login_Logo_Plugin, 'login_head' ) );
+        $secure_password_protected_cookie = apply_filters( 'password_protected_secure_password_protected_cookie', false, $secure );
+        $password_protected_cookie = $this->generate_auth_cookie( $expiration, 'password_protected' );
 
-		} elseif ( class_exists( 'UberLoginLogo' ) ) {
+        setcookie( $this->cookie_name(), $password_protected_cookie, $expire, COOKIEPATH, COOKIE_DOMAIN, $secure_password_protected_cookie, true );
+        if ( COOKIEPATH != SITECOOKIEPATH ) {
+            setcookie( $this->cookie_name(), $password_protected_cookie, $expire, SITECOOKIEPATH, COOKIE_DOMAIN, $secure_password_protected_cookie, true );
+        }
 
-			// Add support for Uber Login Logo plugin
-			add_action( 'password_protected_login_head', array( 'UberLoginLogo', 'replaceLoginLogo' ) );
+    }
 
-		}
+    /**
+     * Clear Auth Cookie
+     */
+    public function clear_auth_cookie() {
 
-	}
+        setcookie( $this->cookie_name(), ' ', current_time( 'timestamp' ) - 31536000, COOKIEPATH, COOKIE_DOMAIN );
+        setcookie( $this->cookie_name(), ' ', current_time( 'timestamp' ) - 31536000, SITECOOKIEPATH, COOKIE_DOMAIN );
 
-	/**
-	 * Login Messages
-	 * Outputs messages and errors in the login template.
-	 */
-	public function login_messages() {
+    }
 
-		// Add message
-		$message = apply_filters( 'password_protected_login_message', '' );
-		if ( ! empty( $message ) ) {
-			echo $message . "\n";
-		}
+    /**
+     * Cookie Name
+     *
+     * @return  string  Cookie name.
+     */
+    public function cookie_name() {
 
-		if ( $this->errors->get_error_code() ) {
+        return $this->get_site_id() . '_password_protected_auth';
 
-			$errors = '';
-			$messages = '';
+    }
 
-			foreach ( $this->errors->get_error_codes() as $code ) {
-				$severity = $this->errors->get_error_data( $code );
-				foreach ( $this->errors->get_error_messages( $code ) as $error ) {
-					if ( 'message' == $severity ) {
-						$messages .= '	' . $error . "<br />\n";
-					} else {
-						$errors .= '	' . $error . "<br />\n";
-					}
-				}
-			}
+    /**
+     * Install
+     */
+    public function install() {
 
-			if ( ! empty( $errors ) ) {
-				echo '<div id="login_error">' . apply_filters( 'password_protected_login_errors', $errors ) . "</div>\n";
-			}
-			if ( ! empty( $messages ) ) {
-				echo '<p class="message">' . apply_filters( 'password_protected_login_messages', $messages ) . "</p>\n";
-			}
+        $old_version = get_option( 'password_protected_version' );
 
-		}
+        // 1.1 - Upgrade to MD5
+        if ( empty( $old_version ) || version_compare( '1.1', $old_version ) ) {
+            $pwd = get_option( 'password_protected_password' );
+            if ( ! empty( $pwd ) ) {
+                $new_pwd = $this->encrypt_password( $pwd );
+                update_option( 'password_protected_password', $new_pwd );
+            }
+        }
 
-	}
+        update_option( 'password_protected_version', $this->version );
 
-	/**
-	 * Load Theme Stylesheet
-	 *
-	 * Check wether a 'password-protected-login.css' stylesheet exists in your theme
-	 * and if so loads it.
-	 *
-	 * Works with child themes.
-	 *
-	 * Possible to specify a different file in the theme folder via the
-	 * 'password_protected_stylesheet_file' filter (allows for theme subfolders).
-	 */
-	public function load_theme_stylesheet() {
+    }
 
-		$filename = apply_filters( 'password_protected_stylesheet_file', 'password-protected-login.css' );
+    /**
+     * Compat
+     *
+     * Support for 3rd party plugins:
+     *
+     * - Login Logo       http://wordpress.org/extend/plugins/login-logo/
+     * - Uber Login Logo  http://wordpress.org/plugins/uber-login-logo/
+     */
+    public function compat() {
 
-		$located = locate_template( $filename );
+        if ( class_exists( 'CWS_Login_Logo_Plugin' ) ) {
 
-		if ( ! empty( $located ) ) {
+            // Add support for Mark Jaquith's Login Logo plugin
+            add_action( 'password_protected_login_head', array( new CWS_Login_Logo_Plugin, 'login_head' ) );
 
-			$stylesheet_directory = trailingslashit( get_stylesheet_directory() );
-			$template_directory = trailingslashit( get_template_directory() );
+        } elseif ( class_exists( 'UberLoginLogo' ) ) {
 
-			if ( $stylesheet_directory == substr( $located, 0, strlen( $stylesheet_directory ) ) ) {
-				wp_enqueue_style( 'password-protected-login', get_stylesheet_directory_uri() . '/' . $filename );
-			} else if ( $template_directory == substr( $located, 0, strlen( $template_directory ) ) ) {
-				wp_enqueue_style( 'password-protected-login', get_template_directory_uri() . '/' . $filename );
-			}
+            // Add support for Uber Login Logo plugin
+            add_action( 'password_protected_login_head', array( 'UberLoginLogo', 'replaceLoginLogo' ) );
 
-		}
+        }
 
-	}
+    }
 
-	/**
-	 * Safe Redirect
-	 *
-	 * Ensure the redirect is to the same site or pluggable list of allowed domains.
-	 * If invalid will redirect to ...
-	 * Based on the WordPress wp_safe_redirect() function.
-	 */
-	public function safe_redirect( $location, $status = 302 ) {
+    /**
+     * Login Messages
+     * Outputs messages and errors in the login template.
+     */
+    public function login_messages() {
 
-		$location = wp_sanitize_redirect( $location );
-		$location = wp_validate_redirect( $location, home_url() );
+        // Add message
+        $message = apply_filters( 'password_protected_login_message', '' );
+        if ( ! empty( $message ) ) {
+            echo $message . "\n";
+        }
 
-		wp_redirect( $location, $status );
+        if ( $this->errors->get_error_code() ) {
 
-	}
+            $errors = '';
+            $messages = '';
 
-	/**
-	 * Is Plugin Supported?
-	 *
-	 * Check to see if there are any known reasons why this plugin may not work in
-	 * the user's hosting environment.
-	 *
-	 * @return  boolean
-	 */
-	static function is_plugin_supported() {
+            foreach ( $this->errors->get_error_codes() as $code ) {
+                $severity = $this->errors->get_error_data( $code );
+                foreach ( $this->errors->get_error_messages( $code ) as $error ) {
+                    if ( 'message' == $severity ) {
+                        $messages .= '  ' . $error . "<br />\n";
+                    } else {
+                        $errors .= '    ' . $error . "<br />\n";
+                    }
+                }
+            }
 
-		return true;
+            if ( ! empty( $errors ) ) {
+                echo '<div id="login_error">' . apply_filters( 'password_protected_login_errors', $errors ) . "</div>\n";
+            }
+            if ( ! empty( $messages ) ) {
+                echo '<p class="message">' . apply_filters( 'password_protected_login_messages', $messages ) . "</p>\n";
+            }
 
-	}
+        }
+
+    }
+
+    /**
+     * Load Theme Stylesheet
+     *
+     * Check wether a 'password-protected-login.css' stylesheet exists in your theme
+     * and if so loads it.
+     *
+     * Works with child themes.
+     *
+     * Possible to specify a different file in the theme folder via the
+     * 'password_protected_stylesheet_file' filter (allows for theme subfolders).
+     */
+    public function load_theme_stylesheet() {
+
+        $filename = apply_filters( 'password_protected_stylesheet_file', 'password-protected-login.css' );
+
+        $located = locate_template( $filename );
+
+        if ( ! empty( $located ) ) {
+
+            $stylesheet_directory = trailingslashit( get_stylesheet_directory() );
+            $template_directory = trailingslashit( get_template_directory() );
+
+            if ( $stylesheet_directory == substr( $located, 0, strlen( $stylesheet_directory ) ) ) {
+                wp_enqueue_style( 'password-protected-login', get_stylesheet_directory_uri() . '/' . $filename );
+            } else if ( $template_directory == substr( $located, 0, strlen( $template_directory ) ) ) {
+                wp_enqueue_style( 'password-protected-login', get_template_directory_uri() . '/' . $filename );
+            }
+
+        }
+
+    }
+
+    /**
+     * Safe Redirect
+     *
+     * Ensure the redirect is to the same site or pluggable list of allowed domains.
+     * If invalid will redirect to ...
+     * Based on the WordPress wp_safe_redirect() function.
+     */
+    public function safe_redirect( $location, $status = 302 ) {
+
+        $location = wp_sanitize_redirect( $location );
+        $location = wp_validate_redirect( $location, home_url() );
+
+        wp_redirect( $location, $status );
+
+    }
+
+    /**
+     * Is Plugin Supported?
+     *
+     * Check to see if there are any known reasons why this plugin may not work in
+     * the user's hosting environment.
+     *
+     * @return  boolean
+     */
+    static function is_plugin_supported() {
+
+        return true;
+
+    }
 
 }
